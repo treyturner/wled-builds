@@ -1,0 +1,92 @@
+diff --git a/wled00/FX_2Dfcn.cpp b/wled00/FX_2Dfcn.cpp
+index c8478d7c5..33f8ff5ca 100644
+--- a/wled00/FX_2Dfcn.cpp
++++ b/wled00/FX_2Dfcn.cpp
+@@ -35,7 +35,7 @@ void WS2812FX::setUpMatrix() {
+     }
+ 
+     // safety check
+-    if (Segment::maxWidth * Segment::maxHeight > MAX_LEDS || Segment::maxWidth > 255 || Segment::maxHeight > 255 || Segment::maxWidth <= 1 || Segment::maxHeight <= 1) {
++    if (Segment::maxWidth * Segment::maxHeight > MAX_LEDS || Segment::maxWidth > WLED_MAX_MATRIX_DIMENSION || Segment::maxHeight > WLED_MAX_MATRIX_DIMENSION || Segment::maxWidth <= 1 || Segment::maxHeight <= 1) {
+       DEBUG_PRINTLN(F("2D Bounds error."));
+       isMatrix = false;
+       Segment::maxWidth = _length;
+diff --git a/wled00/FX_fcn.cpp b/wled00/FX_fcn.cpp
+index d2eb90977..35cc11164 100644
+--- a/wled00/FX_fcn.cpp
++++ b/wled00/FX_fcn.cpp
+@@ -2045,8 +2045,8 @@ bool WS2812FX::deserializeMap(unsigned n) {
+   JsonObject root = pDoc->as<JsonObject>();
+   // if we are loading default ledmap (at boot) set matrix width and height from the ledmap (compatible with WLED MM ledmaps)
+   if (n == 0 && (!root[F("width")].isNull() || !root[F("height")].isNull())) {
+-    Segment::maxWidth  = min(max(root[F("width")].as<int>(), 1), 255);
+-    Segment::maxHeight = min(max(root[F("height")].as<int>(), 1), 255);
++    Segment::maxWidth  = min(max(root[F("width")].as<int>(), 1), WLED_MAX_MATRIX_DIMENSION);
++    Segment::maxHeight = min(max(root[F("height")].as<int>(), 1), WLED_MAX_MATRIX_DIMENSION);
+     isMatrix = true;
+     DEBUG_PRINTF_P(PSTR("LED map width=%d, height=%d\n"), Segment::maxWidth, Segment::maxHeight);
+   }
+diff --git a/wled00/const.h b/wled00/const.h
+index 4ef156bf0..52dadceec 100644
+--- a/wled00/const.h
++++ b/wled00/const.h
+@@ -535,6 +535,12 @@
+   #endif
+ #endif
+ 
++// Maximum accepted matrix width/height. WLED defaults to 255 because some
++// effects use 8-bit coordinate helpers; wide HUB75 builds may opt into 256.
++#ifndef WLED_MAX_MATRIX_DIMENSION
++  #define WLED_MAX_MATRIX_DIMENSION 255
++#endif
++
+ // maximum total memory that can be used for bus-buffers and pixel buffers
+ #ifndef MAX_LED_MEMORY
+   #ifdef ESP8266
+diff --git a/wled00/data/settings_2D.htm b/wled00/data/settings_2D.htm
+index 76f84fa55..f283bdc1d 100644
+--- a/wled00/data/settings_2D.htm
++++ b/wled00/data/settings_2D.htm
+@@ -7,6 +7,7 @@
+ 	<style> html { visibility: hidden; } </style> <!-- prevent white & ugly display while loading, unhidden in loadResources() -->
+ 	<script>
+ 	var maxPanels=64;
++	var maxMatrixDimension=255;
+ 	var ctx = null;
+ 	function fS(){d.Sf.submit();} // <button type=submit> sometimes didn't work
+ 	// load common.js with retry on error
+@@ -23,6 +24,8 @@
+ 		loadJS(getURL('/settings/s.js?p=10'), false, undefined, ()=>{
+ 			UI();
+ 			Sf.MPC.setAttribute("max",maxPanels);
++			Sf.PW.setAttribute("max",maxMatrixDimension);
++			Sf.PH.setAttribute("max",maxMatrixDimension);
+ 		});	// If we set async false, file is loaded and executed, then next statement is processed
+ 		if (loc) d.Sf.action = getURL('/settings/2D');
+ 	}
+@@ -62,9 +65,9 @@ Orientation: <select name="P${i}V" oninput="UI()">
+ 	<option value="1">Vertical</option>
+ </select><br>
+ Serpentine: <input type="checkbox" name="P${i}S" oninput="UI()"><br>
+-Dimensions (WxH): <input name="P${i}W" type="number" min="1" max="255" value="${pw}" oninput="UI()"> x <input name="P${i}H" type="number" min="1" max="255" value="${ph}" oninput="UI()"><br>
+-Offset X: <input name="P${i}X" type="number" min="0" max="255" value="0" oninput="UI()">
+-Y: <input name="P${i}Y" type="number" min="0" max="255" value="0" oninput="UI()"><br><i>(offset from top-left corner in # LEDs)</i>
++Dimensions (WxH): <input name="P${i}W" type="number" min="1" max="${maxMatrixDimension}" value="${pw}" oninput="UI()"> x <input name="P${i}H" type="number" min="1" max="${maxMatrixDimension}" value="${ph}" oninput="UI()"><br>
++Offset X: <input name="P${i}X" type="number" min="0" max="${maxMatrixDimension}" value="0" oninput="UI()">
++Y: <input name="P${i}Y" type="number" min="0" max="${maxMatrixDimension}" value="0" oninput="UI()"><br><i>(offset from top-left corner in # LEDs)</i>
+ <br><br></div>`;
+ 		p.insertAdjacentHTML("beforeend", b);
+ 	}
+diff --git a/wled00/xml.cpp b/wled00/xml.cpp
+index 812ef8c0a..cb30d6ba0 100644
+--- a/wled00/xml.cpp
++++ b/wled00/xml.cpp
+@@ -719,7 +719,7 @@ void getSettingsJS(byte subPage, Print& settingsScript)
+   {
+     printSetFormValue(settingsScript,PSTR("SOMP"),strip.isMatrix);
+     #ifndef WLED_DISABLE_2D
+-    settingsScript.printf_P(PSTR("maxPanels=%d;resetPanels();"),WLED_MAX_PANELS);
++    settingsScript.printf_P(PSTR("maxPanels=%d;maxMatrixDimension=%d;resetPanels();"),WLED_MAX_PANELS,WLED_MAX_MATRIX_DIMENSION);
+     if (strip.isMatrix) {
+       printSetFormValue(settingsScript,PSTR("PW"),strip.panel.size()>0?strip.panel[0].width:8); //Set generator Width and Height to first panel size for convenience
+       printSetFormValue(settingsScript,PSTR("PH"),strip.panel.size()>0?strip.panel[0].height:8);

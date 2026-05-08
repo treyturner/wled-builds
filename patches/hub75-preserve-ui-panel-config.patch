@@ -1,0 +1,50 @@
+diff --git a/wled00/bus_manager.cpp b/wled00/bus_manager.cpp
+index 175d49b..f315903 100644
+--- a/wled00/bus_manager.cpp
++++ b/wled00/bus_manager.cpp
+@@ -808,6 +808,9 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
+   uint8_t chainLength = bc.pins[2];
+   _rows = bc.pins[3];
+   _cols = bc.pins[4];
++  _configPanelWidth  = panelWidth;
++  _configPanelHeight = panelHeight;
++  _configChainLength = max((uint8_t) 1, min(chainLength, (uint8_t) 4));
+ 
+   mxconfig.double_buff = false; // Use our own memory-optimised buffer rather than the driver's own double-buffer
+ 
+@@ -821,7 +824,7 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
+ 
+   mxconfig.clkphase = bc.reversed;
+   // allow chain length up to 4, limit to prevent bad data from preventing boot due to low memory
+-  mxconfig.chain_length = max((uint8_t) 1, min(chainLength, (uint8_t) 4));
++  mxconfig.chain_length = _configChainLength;
+ 
+   if (mxconfig.mx_height >= 64 && (mxconfig.chain_length > 1)) {
+     DEBUGBUS_PRINTLN(F("WARNING, only single panel can be used of 64 pixel boards due to memory"));
+@@ -1144,9 +1147,9 @@ std::vector<LEDType> BusHub75Matrix::getLEDTypes() {
+ 
+ size_t BusHub75Matrix::getPins(uint8_t* pinArray) const {
+   if (pinArray) {
+-    pinArray[0] = mxconfig.mx_width;
+-    pinArray[1] = mxconfig.mx_height;
+-    pinArray[2] = mxconfig.chain_length;
++    pinArray[0] = _configPanelWidth;
++    pinArray[1] = _configPanelHeight;
++    pinArray[2] = _configChainLength;
+     pinArray[3] = _rows;
+     pinArray[4] = _cols;
+   }
+diff --git a/wled00/bus_manager.h b/wled00/bus_manager.h
+index abfb08c..0a917cf 100644
+--- a/wled00/bus_manager.h
++++ b/wled00/bus_manager.h
+@@ -438,6 +438,9 @@ class BusHub75Matrix : public Bus {
+     MatrixPanel_I2S_DMA *display = nullptr;
+     VirtualMatrixPanel  *virtualDisp = nullptr;
+     HUB75_I2S_CFG mxconfig;
++    uint8_t _configPanelWidth = 0;
++    uint8_t _configPanelHeight = 0;
++    uint8_t _configChainLength = 1;
+     unsigned _panelWidth = 0;
+     uint8_t _rows = 1; // panels per row
+     uint8_t _cols = 1; // panels per column
