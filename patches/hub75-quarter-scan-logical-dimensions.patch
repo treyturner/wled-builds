@@ -1,0 +1,34 @@
+diff --git a/wled00/bus_manager.cpp b/wled00/bus_manager.cpp
+index f315903..6496df2 100644
+--- a/wled00/bus_manager.cpp
++++ b/wled00/bus_manager.cpp
+@@ -839,6 +839,12 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
+     DEBUGBUS_PRINTLN("Unknown type");
+     return;
+   }
++  uint8_t virtualPanelWidth = mxconfig.mx_width;
++  uint8_t virtualPanelHeight = mxconfig.mx_height;
++  if (bc.type == TYPE_HUB75MATRIX_QS) {
++    virtualPanelWidth = min((uint8_t) 64, panelWidth);
++    virtualPanelHeight = min((uint8_t) 64, panelHeight);
++  }
+ 
+ #if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S2)// classic esp32, or esp32-s2: reduce bitdepth for large panels
+   if (mxconfig.mx_height >= 64) {
+@@ -1001,14 +1007,14 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
+   if (chainLength > 1 && (_rows > 1 || _cols > 1) || bc.type == TYPE_HUB75MATRIX_QS) {
+     _isVirtual = true;
+     chainType = CHAIN_BOTTOM_LEFT_UP; // TODO: is there any need to support other chaining types?
+-    DEBUGBUS_PRINTF_P(PSTR("Using virtual matrix: %ux%u panels of %ux%u pixels\n"), _cols, _rows, mxconfig.mx_width, mxconfig.mx_height);
++    DEBUGBUS_PRINTF_P(PSTR("Using virtual matrix: %ux%u panels of %ux%u pixels\n"), _cols, _rows, virtualPanelWidth, virtualPanelHeight);
+   }
+   else {
+     _isVirtual = false;
+   }
+ 
+   if (_isVirtual) {
+-    virtualDisp = new VirtualMatrixPanel((*display), _rows, _cols, mxconfig.mx_width, mxconfig.mx_height, chainType);
++    virtualDisp = new VirtualMatrixPanel((*display), _rows, _cols, virtualPanelWidth, virtualPanelHeight, chainType);
+     virtualDisp->setRotation(0);
+     if (bc.type == TYPE_HUB75MATRIX_QS) {
+       switch(panelHeight) {

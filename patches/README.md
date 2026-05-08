@@ -82,3 +82,39 @@ which avoids duplicated or distorted output on real Quarter Scan panels.
 
 This patch can be removed if upstream WLED changes HUB75 config serialization to
 return user-facing panel dimensions instead of internal DMA dimensions.
+
+## `hub75-quarter-scan-logical-dimensions.patch`
+
+### Need
+
+HUB75 Quarter Scan panels need the DMA driver to be configured as if each panel
+is twice as wide and half as tall. That scan conversion is an electrical detail,
+not the visible 2D matrix shape.
+
+WLED v16 was passing those scan-converted dimensions into `VirtualMatrixPanel`.
+That leaked the DMA geometry into WLED's logical pixel space: a physical 64x64
+Quarter Scan panel behaved like a 128x32 panel, and a 4-panel 256x64 wall could
+behave like 512x32. The segment editor then appeared to need bounds larger than
+the visible matrix, and the 2D setup/UI could not reasonably express the shape
+the renderer expected.
+
+### Approach
+
+The patch keeps the DMA configuration unchanged, because Quarter Scan hardware
+still requires the doubled-width/half-height buffer. It changes only the
+`VirtualMatrixPanel` construction:
+
+- Half Scan continues to pass the normal panel dimensions.
+- Quarter Scan passes the user-facing physical panel width and height.
+- The virtual panel layer then translates visible/logical coordinates into the
+  scan-converted DMA coordinates.
+
+With this patch, WLED segments and 2D setup should use actual visible/logical
+matrix bounds. For example, four 64x64 Quarter Scan panels in a row should be
+configured and segmented as 256x64, not 512x32.
+
+### Removal Criteria
+
+This patch can be removed if upstream WLED constructs HUB75 Quarter Scan virtual
+panels with physical dimensions, or moves Quarter Scan remapping fully below the
+WLED 2D matrix layer.
