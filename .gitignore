@@ -1,0 +1,5 @@
+/WLED
+/build
+.env.local
+.npm
+.platformio
